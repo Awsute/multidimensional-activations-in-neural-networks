@@ -45,11 +45,12 @@ class Model:
             for o in range(len(xs)):
                 d_cost = lambda model: 2*(model.forward(xs[o])-ys[o])
                 #cycle thru each node/function
-                #in each function calculate derivative of a single output with respect to each parameter
-                #for each function before calculate derivative with respect to each input
+                #in each function fetch derivative of a single output with respect to each parameter
+                #for each function before fetch derivative with respect to each input
                 #use a sum for multiple inputs
                 for j in range(len(self.layers)):
                     for k in range(j,len(self.layers)):
+                        
                         print()
                 
                 
@@ -68,7 +69,7 @@ class Layer:
             outputs.append(self.nodes[i].forward(input[i]))
         return outputs
 
-#just a helper class, do not need to use but can be used
+#just a helper class, no need to use but can be used
 class Node:
     #each node has an input list and a coefficient list
     #output of node is a list
@@ -81,31 +82,4 @@ class Node:
     def forward(self, input):
         return self.activation.function(input, self.coef)
 
-def node_hyper_relu(input_size):
-    def relu(x, c):
-        if x < c:
-            return 0
-        else:
-            return x
-    
-    def d_relu(x, c):
-        if x < c:
-            return 0
-        else:
-            return 1
-    
-    def da(x, a):
-        output = []
-        for i in range(input_size):
-            output.append(relu(x,a[3*i+1]))
-            output.append(a[3*i]*relu(-x,-a[3*i+1])+a[3*i+2])
-            output.append(1)
-        return output
-    
-    
-    fn = lambda x, a: [(a[3*i]*relu(x[i], a[3*i+1])+a[3*i+2]) for i in range(input_size)]
-    dfdx = lambda x, a: [(a[3*i]*d_relu(x[i], a[3*i+1])) for i in range(input_size)]
-    dfda = lambda x, a: da(x, a)
-    a = [random.random() for i in range(3*input_size)]
-    return Node(Activation(fn,dfdx, dfda), a)
     
