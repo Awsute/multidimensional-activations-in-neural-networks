@@ -43,12 +43,13 @@ class Model:
     def fit(self, xs, ys, epochs):
         for i in range(epochs):
             for o in range(len(xs)):
-                d_cost = lambda model: 2*(model.forward(xs[o])-ys[o])
+                d_cost = 2*(self.forward(xs[o])-ys[o])
                 #cycle thru each node/function
                 #in each function fetch derivative of a single output with respect to each parameter
                 #for each function before fetch derivative with respect to each input
                 #use a sum for multiple inputs
                 for j in range(len(self.layers)):
+                    
                     for k in range(j,len(self.layers)):
                         
                         print()
