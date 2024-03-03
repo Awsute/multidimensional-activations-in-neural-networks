@@ -8,6 +8,10 @@ import math
 import random
 from enum import Enum
 
+
+
+
+
 def foldl(init, func, lis):
     if lis != []:
         return foldl(func(init,lis[0]), func, lis[1:])
@@ -37,29 +41,55 @@ class Activation:
         self.function = function
         self.derivative_x = derivative_x
         self.derivative_a = derivative_a
+    
+def sigmoid(x):
+    return 1/(1+math.e**(-x))
+
+def d_sigmoid(x):
+    return sigmoid(x)*(1-sigmoid(x))
+
+def tanh(x):
+    return math.tanh(x)
+
+def d_tanh(x):
+    return (1/math.cosh(x))**2
 
 
-class Layer:
-    nodes = [None]
-    def __init__(self, nodes):
-        self.nodes = nodes
+#'activation_name' : lambda ins, outs: Node(
+#    activation = Activation(
+#        lambda x,a: f(x,a),
+#        lambda x,a: df/dx,
+#        lambda x,a: df/da
+#    ),
+#    []
+#),
 
-    #forward propogation helper function
-    def forward(self, input):
-        outputs = []
-        for i in range(len(self.nodes)):
-            outputs.append(self.nodes[i].forward(input[i]))
-        return outputs
+activations = {
+    'linear_sum' : lambda ins, outs: Node(
+        activation = Activation(
+            lambda x,a: [sum([x[i]*a[i+1] for i in range(ins)])+a[0] for o in range(outs)],
+            lambda x,a: [[a[i+1] for o in range(outs)] for i in range(ins)],
+            lambda x,a: [[1 for o in range(outs)]]+[[x[i] for o in range(outs)] for i in range(ins)]
+        ),
+        coef = [random.uniform(-1,1) for i in range(ins+1)]
+    ),
+}
+
+
+        
 
 #just a helper class, no need to use but can be used
 class Node:
     #each node has an input list and a coefficient list
     #output of node is a list
     activation = None
+    activation_type = ''
+
     coef = [1]
-    def __init__(self, activation, coef):
+    def __init__(self, activation_type = '', activation = None, coef = [1]):
         self.activation = activation
         self.coef = coef
+        self.activation_type = activation_type
     
     def empty(self, num_coefs):
         return Node(None, [random.random() for x in range(num_coefs)])
@@ -67,14 +97,42 @@ class Node:
     #forward propogation helper helper function
     def forward(self, input):
         return self.activation.function(input, self.coef)
+    
 
+class Layer:
+    nodes = [None]
+    
+    def __init__(self, num_nodes = 0, activation_type = '', nodes = [None]):
+        if nodes[0] != None:
+            self.nodes = nodes
+        else:
+            self.nodes = [Node(activation_type) for i in range(num_nodes)]
+    
+    def compile(self,ins,outs):
+        for i in range(len(self.nodes)):
+            self.nodes[i] = activations[self.nodes[i].activation_type](ins, outs)
+        
+    
+    #forward propogation helper function
+    def forward(self, input):
+        outputs = []
+        for i in range(len(self.nodes)):
+            outputs.append(self.nodes[i].forward(input[i]))
+        return outputs
 
 
 class Model:
     layers = [None]
+    
     def __init__(self, layers):
         self.layers = layers
     
+    def compile(self):
+        self.layers[0].compile(1, len(self.layers[1].nodes))
+        for i in range(1,len(self.layers)-1):
+            self.layers[i].compile(len(self.layers[i-1].nodes), len(self.layers[i+1].nodes))
+        self.layers[-1].compile(len(self.layers[-2].nodes),1)
+
 
     #full forward propogation algorithm
     def forward(self, inputs):
@@ -136,127 +194,61 @@ class Model:
                     for k in range(len(self.layers[j].nodes)):
                         #for each node in current layer
                         
-                        
-                        ##
-                        
-                        ##
-                        ###list for the deriatives of each output with respect to inputs
-                        ###format: [layer1[node1,node2],layer2[node1,node2]]
-                        ##p = []
-                        ##for l in range(j+1,len(self.layers)):
-                        ##    #for each layer in front of current layer
-                        ##    layer_info = []
-                        ##    for m in range(len(self.layers[l].nodes)):
-                        ##        #cycle thru nodes ahead of current layer
-                        ##        node = self.layers[l].nodes[m]
-                        ##            
-                        ##        #format:[[do1/dx1,do2/dx1],[do1/dx2,do2/dx2]]
-                        ##        d_x = node.activation.derivative_x
-                        ##        layer_info.append(d_x(state[l-1][m],node.coef))
-                        ##    p.append(layer_info)
-                        ##
-                        ###backprop helper: get derivative of nodes in a layer
-                        ##def derivative_layer(i):
-                        ##    lis = []
-                        ##
-                        ##    for o in range(len(self.layers[i].nodes)):
-                        ##        node = self.layers[i].nodes[o]
-                        ##        #append derivative of each output with respect to each input
-                        ##        lis.append(node.activation.derivative_x(state[i][o],node.coef))
-                        ##
-                        ##
-                        ##    return lis
                         node = self.layers[j].nodes[k]
                         for a in range(len(node.coef)):
                             node.coef[a] += d_cost*learning_rate*derivative_param(j,k,a,False)
 
 
-def sigmoid(x):
-    return 1/(1+math.e**(-x))
-
-def d_sigmoid(x):
-    return sigmoid(x)*(1-sigmoid(x))
-
-def tanh(x):
-    return math.tanh(x)
-
-def d_tanh(x):
-    return (1/math.cosh(x))**2
 
 
-#2 inputs, 1 output, 2 coefficients
-a0 = Activation(
-    lambda x,a: [tanh(a[0]*x[0])+tanh(a[1]*x[1])],
-    lambda x,a: [[a[0]*d_tanh(a[0]*x[0])], [a[1]*d_tanh(a[1]*x[1])]],
-    lambda x,a: [[x[0]*d_tanh(a[0]*x[0])], [x[1]*d_tanh(a[1]*x[1])]],
-)
-a01 = Activation(
-    lambda x,a: [a[0]*x[0]+a[1]*x[1]],
-    lambda x,a: [[a[0]], [a[1]]],
-    lambda x,a: [[x[0]], [x[1]]],
-)
 
-#2 inputs, 2 outputs, 2 coefficients
-a1 = Activation(
-    lambda x,a: [tanh(a[0]*x[0])+a[1]*x[1], a[0]*x[0]+tanh(a[1]*x[1])],
-    lambda x,a: [[a[0]*d_tanh(a[0]*x[0]), a[1]], [a[0], a[1]*d_tanh(a[1]*x[1])]],
-    lambda x,a: [[x[0]*d_tanh(a[0]*x[0]), x[1]], [x[0], x[1]*d_tanh(a[1]*x[1])]],
-)
-a11 = Activation(
-    lambda x,a: [a[0]*x[0]+a[1]*x[1], a[0]*x[0]+a[1]*x[1]],
-    lambda x,a: [[a[0], a[1]], [a[0], a[1]]],
-    lambda x,a: [[x[0], x[1]], [x[0], x[1]]],
-)
-
-#1 input, 2 outputs, 2 coefficients
-a2 = Activation(
-    lambda x,a: [a[0]*x[0]+a[1], a[0]*x[0]+a[1]],
-    lambda x,a: [[a[0], a[0]]],
-    lambda x,a: [[x[0], x[0]], [1, 1]],
-)
-
-
-#1 input, 1 output, 2 coefficients
-a3 = Activation(
-    lambda x,a: [x[0]*a[0]+a[1]*x[0]],
-    lambda x,a: [[a[0]+a[1]]],
-    lambda x,a: [[x[0]], [x[0]]],
-)
+##2 inputs, 1 output, 2 coefficients
+#a0 = Activation(
+#    lambda x,a: [tanh(a[0]*x[0])+tanh(a[1]*x[1])],
+#    lambda x,a: [[a[0]*d_tanh(a[0]*x[0])], [a[1]*d_tanh(a[1]*x[1])]],
+#    lambda x,a: [[x[0]*d_tanh(a[0]*x[0])], [x[1]*d_tanh(a[1]*x[1])]],
+#)
+#a01 = Activation(
+#    lambda x,a: [a[0]*x[0]+a[1]*x[1]],
+#    lambda x,a: [[a[0]], [a[1]]],
+#    lambda x,a: [[x[0]], [x[1]]],
+#)
+#
+##2 inputs, 2 outputs, 2 coefficients
+#a1 = Activation(
+#    lambda x,a: [tanh(a[0]*x[0])+a[1]*x[1], a[0]*x[0]+tanh(a[1]*x[1])],
+#    lambda x,a: [[a[0]*d_tanh(a[0]*x[0]), a[1]], [a[0], a[1]*d_tanh(a[1]*x[1])]],
+#    lambda x,a: [[x[0]*d_tanh(a[0]*x[0]), x[1]], [x[0], x[1]*d_tanh(a[1]*x[1])]],
+#)
+#a11 = Activation(
+#    lambda x,a: [a[0]*x[0]+a[1]*x[1], a[0]*x[0]+a[1]*x[1]],
+#    lambda x,a: [[a[0], a[1]], [a[0], a[1]]],
+#    lambda x,a: [[x[0], x[1]], [x[0], x[1]]],
+#)
+#
+##1 input, 2 outputs, 2 coefficients
+#a2 = Activation(
+#    lambda x,a: [a[0]*x[0]+a[1], a[0]*x[0]+a[1]],
+#    lambda x,a: [[a[0], a[0]]],
+#    lambda x,a: [[x[0], x[0]], [1, 1]],
+#)
+#
+#
+##1 input, 1 output, 2 coefficients
+#a3 = Activation(
+#    lambda x,a: [x[0]*a[0]+a[1]*x[0]],
+#    lambda x,a: [[a[0]+a[1]]],
+#    lambda x,a: [[x[0]], [x[0]]],
+#)
 
 model = Model([
-    Layer([
-        Node(a2, [random.uniform(-1,1), random.uniform(-1,1)])
-    ]),
-
-    Layer([
-        Node(a2, [random.uniform(-1,1), random.uniform(-1,1)]),
-        Node(a2, [random.uniform(-1,1), random.uniform(-1,1)]),
-    ]),
-    
-    Layer([
-        Node(a1, [random.uniform(-1,1), random.uniform(-1,1)]),
-        Node(a1, [random.uniform(-1,1), random.uniform(-1,1)]),
-    ]),
-
-    Layer([
-        Node(a11, [random.uniform(-1,1), random.uniform(-1,1)]),
-        Node(a11, [random.uniform(-1,1), random.uniform(-1,1)]),
-    ]),
-
-    Layer([
-        Node(a01, [random.uniform(-1,1), random.uniform(-1,1)]),
-        Node(a01, [random.uniform(-1,1), random.uniform(-1,1)]),
-    ]),
-
-    Layer([
-        Node(a01, [random.uniform(-1,1), random.uniform(-1,1)])
-    ]),
-    
-    Layer([
-        Node(a3, [random.uniform(-1,1), random.uniform(-1,1)])
-    ]),
-
+    Layer(1, 'linear_sum'),
+    Layer(2, 'linear_sum'),
+    Layer(3, 'linear_sum'),
+    Layer(1, 'linear_sum')
 ])
+
+model.compile()
 
 out, state = model.forward([[1]])
 
@@ -265,9 +257,9 @@ print(out)
 
 
 x = [[[0]], [[1]], [[2]], [[3]], [[10]], [[-1]]]
-y_c = [[[-3]], [[0]], [[8]], [[6]], [[4]], [[5]]]
-learning_rate = 0.00001
-epochs = 100000
+y_c = [[[0]], [[1]], [[2]], [[3]], [[10]], [[-1]]]
+learning_rate = 0.001
+epochs = 1000
 
 model.fit(x, y_c, epochs, lambda y,ys: 2*(ys[0][0]-y[0][0]), learning_rate)
 
